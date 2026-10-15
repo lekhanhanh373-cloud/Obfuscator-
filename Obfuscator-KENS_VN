@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Obfuscator - Kens_VN Demo</title>
+<style>
+  :root{
+    --bg:#071226; --card:#0f1724; --accent:#8a4dff; --muted:#9fb0d6;
+    --danger:#ff4d4f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto;min-height:100vh;background:linear-gradient(180deg,#021025,#041331);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:20px}
+  .wrap{width:100%;max-width:980px}
+  .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);padding:20px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.6)}
+  h1{margin:0 0 8px;font-size:18px;color:var(--accent);letter-spacing:0.6px}
+  .subtitle{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .row{display:flex;gap:12px;margin-bottom:12px;align-items:center}
+  .col{display:flex;flex-direction:column;gap:8px}
+  input[type="file"]{display:none}
+  .drop{border:2px dashed rgba(255,255,255,0.06);padding:12px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);min-height:120px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted)}
+  textarea{width:100%;min-height:160px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);color:inherit;font-family:monospace;font-size:13px;resize:vertical}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{background:var(--accent);color:#fff;padding:10px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .small{font-size:13px;color:var(--muted)}
+  .progressWrap{background:rgba(255,255,255,0.04);height:18px;border-radius:999px;overflow:hidden;border:1px solid rgba(0,0,0,0.2)}
+  .progress{height:100%;width:0%;background:linear-gradient(90deg,var(--danger), #ff8a8a);transition:width 0.2s linear}
+  .resultBox{margin-top:12px;background:rgba(0,0,0,0.4);padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
+  .meta{font-size:13px;color:var(--muted);margin-top:6px}
+  .notice{background:#0b1926;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);color:var(--muted);font-size:13px}
+  .flexBetween{display:flex;justify-content:space-between;align-items:center}
+  .kbd{background:rgba(255,255,255,0.03);padding:4px 6px;border-radius:6px;font-family:monospace}
+  .rowGrid{display:grid;grid-template-columns:1fr 360px;gap:12px}
+  @media (max-width:820px){ .rowGrid{grid-template-columns:1fr} .col-right{width:100%} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>WELCOME TO OBFUSCATOR BELONG TO KENS_VN!</h1>
+      <div class="subtitle">Dùng để bảo vệ local scripts (ví dụ: .sh, .py, .ps1, .bat, .cmd, ...). Không dùng để che giấu mã độc.</div>
+
+      <div class="rowGrid">
+        <div class="col">
+          <label class="small">Gắn local script (kéo/thả hoặc chọn file) — placeholder: "gắn local script"</label>
+          <div id="dropZone" class="drop" tabindex="0">Kéo thả file ở đây hoặc <button id="pickBtn" class="btn ghost" style="margin-left:8px">Chọn file</button></div>
+
+          <div style="margin-top:10px" class="small">Hoặc dán/nhập code vào đây:</div>
+          <textarea id="sourceArea" placeholder="// gắn local script" spellcheck="false"></textarea>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <select id="decoderLang" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit">
+              <option value="none">Không sinh decoder</option>
+              <option value="python">Sinh decoder (Python)</option>
+              <option value="powershell">Sinh decoder (PowerShell)</option>
+              <option value="bash">Sinh decoder (Bash)</option>
+            </select>
+
+            <label class="small" style="margin-left:8px">Mode:</label>
+            <select id="modeSelect" style="padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit">
+              <option value="reversible" selected>Reversible (XOR + Base64)</option>
+            </select>
+          </div>
+
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <button id="obfBtn" class="btn">Obfuscator</button>
+            <div class="small">Thời gian phụ thuộc vào kích thước file</div>
+          </div>
+
+          <div style="margin-top:12px" id="progressArea" class="hidden">
+            <div class="flexBetween">
+              <div class="small">Progress</div>
+              <div class="small kbd" id="eta">ETA: --</div>
+            </div>
+            <div style="margin-top:8px" class="progressWrap">
+              <div id="progressBar" class="progress"></div>
+            </div>
+          </div>
+
+          <div id="resultArea" class="resultBox hidden">
+            <div class="flexBetween">
+              <div style="font-weight:700">Kết quả (obfuscated)</div>
+              <div style="display:flex;gap:8px">
+                <button id="copyBtn" class="btn ghost">Copy</button>
+                <button id="downloadBtn" class="btn">Tải xuống</button>
+              </div>
+            </div>
+            <div class="meta" style="margin-top:8px">Key (lưu cẩn thận để giải mã): <span id="keyBox" class="kbd">—</span> <button id="copyKey" class="btn ghost" style="margin-left:8px">Copy key</button></div>
+
+            <textarea id="outArea" style="margin-top:8px;min-height:220px;font-family:monospace;"></textarea>
+
+            <div id="decoderStubWrap" style="margin-top:8px;display:none">
+              <div style="font-weight:700">Decoder stub (copy xuống):</div>
+              <textarea id="decoderStub" style="margin-top:6px;min-height:120px;font-family:monospace"></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top:12px" class="notice">
+            Lưu ý: bản demo này chỉ mã hoá text client-side. Nếu bạn muốn obfuscate các file lớn, công cụ sẽ mô phỏng thời gian lâu hơn. Không dùng để che giấu mã độc. Mình không lưu file của bạn lên server — mọi việc diễn ra trên trình duyệt.
+          </div>
+        </div>
+
+        <div class="col col-right">
+          <div style="background:rgba(255,255,255,0.02);padding:12px;border-radius:8px">
+            <div style="font-weight:700;margin-bottom:8px">Thông tin file</div>
+            <div class="small">Tên: <span id="metaName">—</span></div>
+            <div class="small">Kích thước: <span id="metaSize">—</span></div>
+            <div class="small">MIME: <span id="metaType">—</span></div>
+            <div style="margin-top:12px" class="small">Trạng thái: <span id="metaStatus">Chưa gắn</span></div>
+
+            <div style="margin-top:14px">
+              <div style="font-weight:700;margin-bottom:6px">Hướng dẫn nhanh</div>
+              <ol class="small" style="padding-left:16px">
+                <li>Gắn file bằng cách kéo/thả hoặc bấm "Chọn file".</li>
+                <li>Hoặc dán nội dung trực tiếp vào ô.</li>
+                <li>Chọn decoder (nếu cần) và bấm "Obfuscator".</li>
+                <li>Chờ thanh máu đầy — sau khi xong copy key & mã hoá.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;background:rgba(255,255,255,0.02);padding:12px;border-radius:8px">
+            <div style="font-weight:700;margin-bottom:8px">Tùy chọn nâng cao</div>
+            <div class="small">Bạn muốn output khác (ví dụ: tạo 1 file chứa cả stub + payload)? Mình có thể thêm chức năng này nếu bạn cần.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+/* Obfuscator demo
+ - reversible XOR + base64
+ - per-file random key (shown to user)
+ - progress bar time ~ base + size_factor
+ - decoder stubs (Python, PowerShell, Bash) created to decode and write original file (they don't auto-execute)
+*/
+
+// helpers
+const pickBtn = document.getElementById('pickBtn');
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.createElement('input');
+fileInput.type = 'file';
+fileInput.style.display = 'none';
+fileInput.multiple = false;
+document.body.appendChild(fileInput);
+
+const sourceArea = document.getElementById('sourceArea');
+const obfBtn = document.getElementById('obfBtn');
+const progressArea = document.getElementById('progressArea');
+const progressBar = document.getElementById('progressBar');
+const etaBox = document.getElementById('eta');
+const resultArea = document.getElementById('resultArea');
+const outArea = document.getElementById('outArea');
+const keyBox = document.getElementById('keyBox');
+const copyBtn = document.getElementById('copyBtn');
+const copyKey = document.getElementById('copyKey');
+const downloadBtn = document.getElementById('downloadBtn');
+const decoderLang = document.getElementById('decoderLang');
+const decoderStubWrap = document.getElementById('decoderStubWrap');
+const decoderStub = document.getElementById('decoderStub');
+
+const metaName = document.getElementById('metaName');
+const metaSize = document.getElementById('metaSize');
+const metaType = document.getElementById('metaType');
+const metaStatus = document.getElementById('metaStatus');
+
+let currentFile = null; // {name,size,type,text}
+let currentKey = null;
+let currentPayload = null; // base64 string
+
+// file picking
+pickBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if(f) readFile(f);
+  fileInput.value = '';
+});
+
+dropZone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropZone.style.borderColor = '#7b5cff'; });
+dropZone.addEventListener('dragleave', (e)=>{ dropZone.style.borderColor = ''; });
+dropZone.addEventListener('drop', (e)=>{ e.preventDefault(); dropZone.style.borderColor = ''; const f = e.dataTransfer.files[0]; if(f) readFile(f); });
+dropZone.addEventListener('click', ()=> fileInput.click());
+
+// read file as text
+function readFile(f){
+  const reader = new FileReader();
+  reader.onload = ()=> {
+    const txt = reader.result;
+    currentFile = {name: f.name, size: f.size, type: f.type || 'text/plain', text: txt};
+    sourceArea.value = txt;
+    metaName.textContent = f.name;
+    metaSize.textContent = formatBytes(f.size);
+    metaType.textContent = currentFile.type;
+    metaStatus.textContent = 'Đã gắn';
+  };
+  reader.onerror = ()=> { alert('Không đọc được file'); };
+  reader.readAsText(f);
+}
+
+// allow paste into textarea
+sourceArea.addEventListener('input', ()=> {
+  const txt = sourceArea.value;
+  if(txt && txt.length > 0 && (!currentFile || currentFile.text !== txt)){
+    currentFile = {name: 'pasted_script.txt', size: new TextEncoder().encode(txt).length, type:'text/plain', text: txt};
+    metaName.textContent = currentFile.name;
+    metaSize.textContent = formatBytes(currentFile.size);
+    metaType.textContent = currentFile.type;
+    metaStatus.textContent = 'Đã gắn (dán)';
+  }
+});
+
+// obfuscate
+obfBtn.addEventListener('click', async ()=>{
+  if(!sourceArea.value || sourceArea.value.trim() === ''){
+    alert('Vui lòng gắn local script hoặc dán nội dung vào ô.');
+    return;
+  }
+  // ensure currentFile info updated
+  if(!currentFile || currentFile.text !== sourceArea.value){
+    const txt = sourceArea.value;
+    currentFile = {name: 'pasted_script.txt', size: new TextEncoder().encode(txt).length, type:'text/plain', text: txt};
+    metaName.textContent = currentFile.name;
+    metaSize.textContent = formatBytes(currentFile.size);
+    metaType.textContent = currentFile.type;
+    metaStatus.textContent = 'Đã gắn (dán)';
+  }
+
+  // generate random key
+  currentKey = genKey(16); // 16-byte key hex
+  keyBox.textContent = currentKey.hex;
+  // show progress
+  resultArea.classList.add('hidden');
+  progressArea.classList.remove('hidden');
+  progressBar.style.width = '0%';
+  let size = currentFile.size || new TextEncoder().encode(currentFile.text).length;
+  // determine duration: base + per KB
+  const baseMs = 500; // base
+  const perKb = 40; // ms per KB
+  const duration = baseMs + Math.max(0, Math.floor(size/1024)) * perKb;
+  const start = Date.now();
+  const end = start + duration;
+  etaBox.textContent = 'ETA: ' + msToTime(duration);
+
+  // animate progress (simulate computing)
+  await animateProgress(duration, (p) => {
+    progressBar.style.width = (p*100).toFixed(1) + '%';
+    const remaining = Math.max(0, Math.round((end - Date.now())/1000));
+    etaBox.textContent = 'ETA: ' + (remaining>0? remaining + 's':'0s');
+  });
+
+  // actually obfuscate (XOR + base64)
+  const ob = xorAndBase64(currentFile.text, currentKey.bytes);
+  currentPayload = ob; // base64 string
+
+  // show output
+  outArea.value = ob;
+  resultArea.classList.remove('hidden');
+  progressArea.classList.add('hidden');
+
+  // prepare decoder stub if requested
+  const lang = decoderLang.value;
+  if(lang !== 'none'){
+    const stub = makeDecoderStub(lang, ob, currentKey.hex, currentFile.name);
+    decoderStub.value = stub;
+    decoderStubWrap.style.display = 'block';
+  } else {
+    decoderStubWrap.style.display = 'none';
+    decoderStub.value = '';
+  }
+});
+
+// animateProgress: calls onTick with p in [0,1]
+function animateProgress(duration, onTick){
+  return new Promise(res=>{
+    const start = Date.now();
+    const step = ()=>{
+      const now = Date.now();
+      const p = Math.min(1, (now - start) / duration);
+      onTick(p);
+      if(p < 1) requestAnimationFrame(step);
+      else setTimeout(res, 120);
+    };
+    step();
+  });
+}
+
+// XOR text with key bytes and base64 encode result
+function xorAndBase64(text, keyBytes){
+  const enc = new TextEncoder();
+  const data = enc.encode(text);
+  const out = new Uint8Array(data.length);
+  for(let i=0;i<data.length;i++){
+    out[i] = data[i] ^ keyBytes[i % keyBytes.length];
+  }
+  // convert to binary string for btoa
+  const binStr = uint8ToString(out);
+  const b64 = btoa(binStr);
+  return b64;
+}
+function uint8ToString(u8){
+  let s = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < u8.length; i += chunk) {
+    s += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+  }
+  return s;
+}
+function stringToUint8(s){
+  const u = new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) u[i] = s.charCodeAt(i);
+  return u;
+}
+
+// generate key
+function genKey(len){
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  // hex representation
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+  return {bytes, hex};
+}
+
+// copy output
+copyBtn.addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(outArea.value);
+    showToast('Đã copy mã obfuscated');
+  }catch(e){ alert('Không copy được: ' + e); }
+});
+copyKey.addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(currentKey.hex);
+    showToast('Đã copy key');
+  }catch(e){ alert('Không copy được'); }
+});
+
+// download obfuscated file
+downloadBtn.addEventListener('click', ()=>{
+  if(!currentPayload) return;
+  const filename = currentFile && currentFile.name ? (currentFile.name + '.obf.txt') : 'obfuscated.txt';
+  const blob = new Blob([currentPayload], {type:'text/plain'});
+  triggerDownload(blob, filename);
+});
+
+// helper to create decoder stub (does NOT auto-execute; only writes file)
+function makeDecoderStub(lang, b64, keyHex, origName){
+  if(!origName) origName = 'decoded_script.txt';
+  const keyBytes = keyHex.match(/.{1,2}/g).map(h=>parseInt(h,16));
+  // we embed b64 and keyHex in stub. Stub will decode and write to file.
+  if(lang === 'python'){
+    return `# Decoder stub (Python 3)
+import base64
+def xor_decrypt(data_bytes, key):
+    return bytes(b ^ key[i % len(key)] for i,b in enumerate(data_bytes))
+
+b64 = """${b64}"""
+key_hex = "${keyHex}"
+out_name = "${origName}"
+
+data = base64.b64decode(b64)
+key = bytes.fromhex(key_hex)
+plain = xor_decrypt(data, key)
+# write bytes (original encoding preserved)
+with open(out_name, 'wb') as f:
+    f.write(plain)
+print("Wrote decoded file to", out_name)
+`;
+  } else if(lang === 'powershell'){
+    // PowerShell stub (writes bytes)
+    return `# Decoder stub (PowerShell)
+# Save as decode.ps1 then run in PowerShell
+$b64 = @"${b64}"@
+$keyHex = "${keyHex}"
+$outName = "${origName}"
+
+[byte[]]$data = [System.Convert]::FromBase64String($b64)
+$keyBytes = for($i=0; $i -lt $keyHex.Length; $i+=2){ [Convert]::ToByte($keyHex.Substring($i,2),16) }
+
+for($i=0; $i -lt $data.Length; $i++){
+  $data[$i] = $data[$i] -bxor $keyBytes[$i % $keyBytes.Length]
+}
+[System.IO.File]::WriteAllBytes($outName, $data)
+Write-Host "Wrote decoded file to $outName"
+`;
+  } else if(lang === 'bash'){
+    // Bash uses base64 + xxd to hex and xor via python inline
+    return `#!/usr/bin/env bash
+# Decoder stub (Bash) - requires python3
+b64="${b64}"
+keyhex="${keyHex}"
+outname="${origName}"
+python3 - <<PY
+import base64
+b64 = "${b64}"
+key = bytes.fromhex("${keyHex}")
+data = base64.b64decode(b64)
+plain = bytes([b ^ key[i % len(key)] for i,b in enumerate(data)])
+open("${origName}", "wb").write(plain)
+print("Wrote decoded file to ${origName}")
+PY
+`;
+  } else {
+    return '# Không hỗ trợ ngôn ngữ decoder này.';
+  }
+}
+
+// download helper
+function triggerDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 30000);
+}
+
+// utils
+function formatBytes(n){
+  if(n < 1024) return n + ' B';
+  if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/(1024*1024)).toFixed(2) + ' MB';
+}
+function msToTime(ms){ return Math.ceil(ms/1000) + 's'; }
+function showToast(text, ms=1800){
+  const d = document.createElement('div');
+  d.textContent = text;
+  d.style.position = 'fixed';
+  d.style.bottom = '20px';
+  d.style.left = '50%';
+  d.style.transform = 'translateX(-50%)';
+  d.style.background = 'rgba(0,0,0,0.7)';
+  d.style.color = '#fff';
+  d.style.padding = '8px 12px';
+  d.style.borderRadius = '8px';
+  d.style.zIndex = 9999;
+  document.body.appendChild(d);
+  setTimeout(()=>{ d.remove(); }, ms);
+}
+</script>
+</body>
+</html>
